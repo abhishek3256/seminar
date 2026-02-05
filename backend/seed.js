@@ -30,7 +30,7 @@ const seedData = async () => {
 
         // 1. Create Admin User
         const adminUser = new User({
-            name: 'Admin User',
+            name: 'Admin',
             email: 'admin@example.com',
             password: 'Admin@2024#Secure', // Strong password: uppercase, lowercase, numbers, symbols
             role: 'admin'

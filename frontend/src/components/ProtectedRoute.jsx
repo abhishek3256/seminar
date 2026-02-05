@@ -1,93 +1,35 @@
 import { Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-    const [isAuthorized, setIsAuthorized] = useState(null); // null = checking, true = authorized, false = unauthorized
+    // Simplified - just check if user is logged in
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
 
-    useEffect(() => {
-        console.log('🔒 ProtectedRoute: Starting auth check...');
+    console.log('🔒 ProtectedRoute Check:', {
+        hasToken: !!token,
+        hasUser: !!userStr,
+        allowedRoles
+    });
 
-        // Add timeout to prevent infinite "Checking authentication..." state
-        const authTimeout = setTimeout(() => {
-            console.error('⏱️ ProtectedRoute: Auth check timeout - redirecting to login');
-            setIsAuthorized(false);
-        }, 2000);
-
-        // Get user from localStorage
-        const token = localStorage.getItem('token');
-        const userStr = localStorage.getItem('user');
-
-        console.log('🔒 ProtectedRoute: Token exists?', !!token);
-        console.log('🔒 ProtectedRoute: User data exists?', !!userStr);
-
-        // No token or user data - not logged in
-        if (!token || !userStr) {
-            console.log('❌ ProtectedRoute: No token or user data found');
-            clearTimeout(authTimeout);
-            setIsAuthorized(false);
-            return;
-        }
-
-        try {
-            const user = JSON.parse(userStr);
-            console.log('✅ ProtectedRoute: User parsed:', {
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                allowedRoles
-            });
-
-            // If no role is specified, assign default 'student' role for backward compatibility
-            if (!user || !user.role) {
-                console.warn('⚠️ ProtectedRoute: User missing role, defaulting to student');
-                user.role = 'student';
-            }
-
-            // Check if user role is allowed (only if specific roles are required)
-            if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-                console.log('🚫 ProtectedRoute: User role not allowed', { userRole: user.role, allowedRoles });
-                clearTimeout(authTimeout);
-                setIsAuthorized('denied');
-                return;
-            }
-
-            // User is authenticated and authorized
-            console.log('✅ ProtectedRoute: Access granted!');
-            clearTimeout(authTimeout);
-            setIsAuthorized(true);
-        } catch (error) {
-            console.error('❌ ProtectedRoute: Error parsing user data:', error);
-            clearTimeout(authTimeout);
-            setIsAuthorized(false);
-        }
-
-        return () => clearTimeout(authTimeout);
-    }, [allowedRoles]);
-
-    // Show loading state while checking
-    if (isAuthorized === null) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <div className="text-white">Checking authentication...</div>
-            </div>
-        );
-    }
-
-    // Not authorized - redirect to login
-    if (isAuthorized === false) {
+    // Not logged in - redirect to login
+    if (!token || !userStr) {
+        console.log('❌ Not logged in - redirecting to /login');
         return <Navigate to="/login" replace />;
     }
 
-    // Access denied - show error message
-    if (isAuthorized === 'denied') {
-        const userStr = localStorage.getItem('user');
-        let user = {};
-        try {
-            user = userStr ? JSON.parse(userStr) : {};
-        } catch (e) {
-            console.error('Error parsing user:', e);
-        }
+    // Parse user data
+    let user;
+    try {
+        user = JSON.parse(userStr);
+        console.log('✅ User logged in:', user.email, 'Role:', user.role);
+    } catch (error) {
+        console.error('❌ Error parsing user data:', error);
+        return <Navigate to="/login" replace />;
+    }
 
+    // Check role if required
+    if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+        console.log('🚫 Access denied - wrong role');
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
                 <div className="bg-slate-900 border border-red-500/50 rounded-xl p-8 max-w-md text-center">
@@ -111,7 +53,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
         );
     }
 
-    // User is authenticated and authorized
+    // User is authenticated and authorized - render children
+    console.log('✅ Access granted - rendering page');
     return children;
 };
 
