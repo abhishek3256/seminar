@@ -30,10 +30,12 @@ const seedData = async () => {
 
         // 1. Create Admin User
         const adminUser = new User({
-            name: 'Admin',
             email: 'admin@example.com',
-            password: 'Admin@2024#Secure', // Strong password: uppercase, lowercase, numbers, symbols
-            role: 'admin'
+            password: 'Admin@2024#Secure',
+            role: 'admin',
+            isActive: true,
+            isVerified: true,
+            profileCompleted: true
         });
         await adminUser.save();
         console.log('✅ Admin user created');
@@ -50,22 +52,35 @@ const seedData = async () => {
         const studentUsers = [];
         const studentsModels = [];
 
+        let rollCounter = 101;
         for (const s of studentsData) {
             const user = await User.create({
-                name: s.name,
                 email: s.email,
-                password: "password123", // Will be hashed by pre-save hook
-                role: "student"
+                password: "password123",
+                role: "student",
+                isActive: true,
+                isVerified: true,
+                profileCompleted: true
             });
             studentUsers.push(user);
 
             const student = await Student.create({
-                user: user._id,
-                bio: `Passionate ${s.branch} student skilled in ${s.skills.join(", ")}.`,
+                userId: user._id,
+                fullName: s.name,
+                phone: `98765${rollCounter}`, // Dummy phone
+                rollNumber: `ROLL-${rollCounter++}`,
+                gender: 'Male', // Dummy
+                currentCGPA: (7 + Math.random() * 3).toFixed(2),
+                branch: s.branch,
                 skills: s.skills,
-                cgpa: (7 + Math.random() * 3).toFixed(2), // 7.00 - 10.00
-                graduationYear: 2025,
-                branch: s.branch
+                resume: {
+                    url: "https://example.com/resume.pdf",
+                    uploadedAt: new Date(),
+                    parsedData: {
+                        extractedSkills: s.skills,
+                        contactInfo: { email: s.email, phone: "9876543210" }
+                    }
+                }
             });
             studentsModels.push(student);
         }
@@ -84,17 +99,22 @@ const seedData = async () => {
 
         for (const c of companiesData) {
             const user = await User.create({
-                name: c.name,
                 email: c.email,
                 password: "password123",
-                role: "company"
+                role: "company",
+                isActive: true,
+                isVerified: true,
+                profileCompleted: true
             });
 
             const company = await Company.create({
-                user: user._id,
+                userId: user._id,
+                companyName: c.name,
+                companyEmail: c.email,
                 industry: c.industry,
-                location: c.location,
-                description: `Leading company in ${c.industry} based in ${c.location}.`
+                headquartersLocation: c.location,
+                about: `Leading company in ${c.industry} based in ${c.location}.`,
+                isVerified: true
             });
             companyModels.push(company);
         }
@@ -102,13 +122,11 @@ const seedData = async () => {
 
         // 4. Create Jobs
         const jobsData = [
-            { title: "SDE-1", desc: "Junior Software Developer role.", type: "Full-time", salary: "12-15 LPA" },
-            { title: "Frontend Intern", desc: "React.js internship.", type: "Internship", salary: "25k/month" },
-            { title: "Data Analyst", desc: "Analyze business metrics.", type: "Full-time", salary: "10-12 LPA" },
-            { title: "Backend Engineer", desc: "Node.js & Microservices.", type: "Full-time", salary: "18-22 LPA" },
-            { title: "AI Researcher", desc: "Work on LLMs.", type: "Full-time", salary: "25-30 LPA" },
-            { title: "Product Manager", desc: "Manage product lifecycle.", type: "Full-time", salary: "15-20 LPA" },
-            { title: "DevOps Engineer", desc: "AWS and CI/CD.", type: "Full-time", salary: "14-18 LPA" },
+            { title: "SDE-1", desc: "Junior Software Developer role.", type: "Full-time", salaryMin: 1200000, salaryMax: 1500000 },
+            { title: "Frontend Intern", desc: "React.js internship.", type: "Internship", salaryMin: 300000, salaryMax: 400000 },
+            { title: "Data Analyst", desc: "Analyze business metrics.", type: "Full-time", salaryMin: 1000000, salaryMax: 1200000 },
+            { title: "Backend Engineer", desc: "Node.js & Microservices.", type: "Full-time", salaryMin: 1800000, salaryMax: 2200000 },
+            { title: "AI Researcher", desc: "Work on LLMs.", type: "Full-time", salaryMin: 2500000, salaryMax: 3000000 },
         ];
 
         const jobModels = [];
@@ -119,32 +137,51 @@ const seedData = async () => {
             for (let i = 0; i < numJobs; i++) {
                 const jobInfo = jobsData[Math.floor(Math.random() * jobsData.length)];
                 const job = await Job.create({
-                    company: company._id,
+                    companyId: company._id,
                     title: jobInfo.title,
-                    description: `${jobInfo.desc} Join ${company.description}`,
+                    description: `${jobInfo.desc} Join ${company.companyName}`,
                     requirements: ["Bachelor's Degree", "Good Communication"],
-                    location: company.location,
-                    type: jobInfo.type,
-                    salaryRange: jobInfo.salary
+                    location: company.headquartersLocation,
+                    jobType: jobInfo.type,
+                    salary: {
+                        min: jobInfo.salaryMin,
+                        max: jobInfo.salaryMax,
+                        currency: 'INR'
+                    },
+                    isActive: true,
+                    applicationDeadline: new Date(new Date().setMonth(new Date().getMonth() + 1))
                 });
                 jobModels.push(job);
+
+                // Update Company stats
+                company.jobsPosted.push(job._id);
+                company.activeJobs += 1;
+                await company.save();
             }
         }
         console.log(`✅ Created ${jobModels.length} Jobs`);
 
         // 5. Create Applications
         for (const student of studentsModels) {
-            // Each student applies to 2-3 jobs
-            const numApps = Math.floor(Math.random() * 3) + 2;
+            // Each student applies to 1-2 jobs
+            const numApps = Math.floor(Math.random() * 2) + 1;
             const shuffledJobs = jobModels.sort(() => 0.5 - Math.random());
             const selectedJobs = shuffledJobs.slice(0, numApps);
 
             for (const job of selectedJobs) {
+                // Fetch company from job (since job.companyId is just an ID)
+                // Or we can just use job.companyId directly
+
                 await Application.create({
-                    job: job._id,
-                    student: student._id,
-                    status: ['Applied', 'Shortlisted', 'Rejected'][Math.floor(Math.random() * 3)],
-                    aiScore: Math.floor(Math.random() * 100)
+                    studentId: student._id,
+                    jobId: job._id,
+                    companyId: job.companyId,
+                    status: ['Submitted', 'Shortlisted', 'Rejected'][Math.floor(Math.random() * 3)],
+                    resumeSnapshot: {
+                        url: student.resume.url,
+                        parsedSkills: student.skills,
+                        matchScore: Math.floor(Math.random() * 40) + 60
+                    }
                 });
             }
         }
@@ -155,6 +192,8 @@ const seedData = async () => {
 
     } catch (error) {
         console.error("❌ Seeding Error:", error);
+        console.error(error.message); // Print concise message
+        if (error.errors) console.error(JSON.stringify(error.errors, null, 2)); // Print validation details
         process.exit(1);
     }
 };

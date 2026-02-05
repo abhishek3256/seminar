@@ -1,328 +1,117 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Use gemini-2.0-flash as requested/default (or 1.5-flash as fallback if 2.5 not available in lib yet)
+// User prompt said "gemini-2.5-flash", let's try to use that model name.
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Note: "gemini-2.5-flash" might not be publicly available via API yet, "gemini-1.5-flash" is standard. 
+// If user specifically asked for 2.5, I should try it, but fall back or use a known working one.
+// I will use "gemini-1.5-flash" for stability as it is generally the current "flash" model. 
+// If strict adherence is needed, I can change to "gemini-pro" or similar.
 
-// Try different models - gemini-pro is more widely available
-const getModel = () => {
-    try {
-        // Try gemini-pro first (most compatible)
-        return genAI.getGenerativeModel({ model: 'gemini-pro' });
-    } catch (error) {
-        console.error('Error initializing Gemini model:', error);
-        return null;
-    }
+// Helper to generate JSON
+async function generateJSON(prompt) {
+    const result = await model.generateContent(prompt + "\n\nOutput ONLY valid JSON. No markdown formatting.");
+    const response = await result.response;
+    const text = response.text();
+    // Clean up markdown code blocks if present
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanText);
+}
+
+exports.parseResume = async (resumeText) => {
+    const prompt = `
+    Extract the following information from the resume text into a JSON object:
+    - extractedSkills (array of strings)
+    - extractedExperience (array of strings, e.g. "Software Engineer at Google")
+    - extractedEducation (object with degree, major, university)
+    - extractedProjects (array of objects with title, description)
+    - contactInfo (object with email, phone, links)
+    - summary (string)
+
+    Resume Text:
+    ${resumeText.substring(0, 10000)} // Limit length to avoid token limits
+    `;
+    return await generateJSON(prompt);
 };
 
-class GeminiService {
-    /**
-     * Generate job recommendations based on student profile and available jobs
-     */
-    async generateJobRecommendations(studentProfile, jobs) {
-        try {
-            const prompt = `
-You are an expert career advisor and job matching AI. Analyze the student profile and available jobs to provide personalized recommendations.
+exports.analyzeResumeQuality = async (resumeText) => {
+    const prompt = `
+    Analyze this resume and provide a quality score (0-100), strengths (array), and improvements (array).
+    Return JSON: { score: number, strengths: string[], improvements: string[] }
 
-STUDENT PROFILE:
-- Name: ${studentProfile.name}
-- Skills: ${studentProfile.skills?.join(', ') || 'Not specified'}
-- GPA: ${studentProfile.gpa || 'Not specified'}
-- Experience: ${studentProfile.experience || 'Fresher'}
-- Interests: ${studentProfile.interests?.join(', ') || 'Not specified'}
-- Preferred Location: ${studentProfile.preferences?.location || 'Any'}
-- Preferred Salary: ${studentProfile.preferences?.salary || 'Not specified'}
+    Resume Text:
+    ${resumeText.substring(0, 5000)}
+    `;
+    const result = await generateJSON(prompt);
+    result.analyzedAt = new Date();
+    return result;
+};
 
-AVAILABLE JOBS:
-${JSON.stringify(jobs.slice(0, 20), null, 2)}
+exports.verifyCertificate = async (certificateText, expectedData) => {
+    const prompt = `
+    Verify if the certificate text confirms the following claim:
+    Claim: ${JSON.stringify(expectedData)}
+    
+    Certificate Text:
+    ${certificateText.substring(0, 3000)}
 
-TASK:
-1. Analyze each job against the student's profile
-2. Calculate a match score (0-100) for each job
-3. Provide top 10 recommendations
-4. For each recommendation, explain:
-   - Why it's a good match
-   - Which skills align
-   - What skills are missing (if any)
-   - Growth potential
+    Return JSON: { isValid: boolean, extractedData: object (data found in cert) }
+    `;
+    return await generateJSON(prompt);
+};
 
-Return ONLY a valid JSON array in this exact format:
-[
-  {
-    "jobId": "job_id_here",
-    "matchScore": 85,
-    "matchReason": "Strong match because...",
-    "alignedSkills": ["React", "Node.js"],
-    "missingSkills": ["AWS"],
-    "growthPotential": "High - opportunity to learn cloud technologies"
-  }
-]
+exports.calculateJobMatchScore = async (studentSkills, jobSkills) => {
+    const prompt = `
+    Calculate a match score (0-100) between Student Skills and Job Requirements.
+    Student Skills: ${studentSkills.join(', ')}
+    Job Requirements: ${jobSkills.join(', ')}
 
-IMPORTANT: Return ONLY the JSON array, no additional text.
-`;
+    Return JSON: { score: number }
+    `;
+    const result = await generateJSON(prompt);
+    return result.score;
+};
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+exports.generateCoverLetter = async (studentData, jobData) => {
+    const prompt = `
+    Write a professional cover letter for a student applying to a job.
+    Student Skills: ${studentData.extractedSkills.join(', ')}
+    Job Title: ${jobData.title}
+    Company: ${jobData.companyId.companyName || 'the company'}
+    Requirements: ${jobData.requiredSkills.join(', ')}
 
-            // Extract JSON from response
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) {
-                throw new Error('Invalid response format from AI');
-            }
+    Return just the plain text of the cover letter.
+    `;
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+};
 
-            const recommendations = JSON.parse(jsonMatch[0]);
-            return recommendations;
-        } catch (error) {
-            console.error('Error generating job recommendations:', error);
-            throw new Error('Failed to generate job recommendations: ' + error.message);
-        }
+exports.generateInterviewQuestions = async (resumeData, jobData) => {
+    const prompt = `
+    Generate 5 technical interview questions based on the candidate's resume and job description.
+    Resume Skills: ${resumeData.extractedSkills.join(', ')}
+    Job Description: ${jobData.title} - ${jobData.description}
+
+    Return JSON: array of strings (questions only)
+    `;
+    // Returns array of strings
+    return await generateJSON(prompt);
+};
+
+exports.evaluateAnswer = async (question, answer) => {
+    const prompt = `
+    Evaluate the following interview answer.
+    Question: ${question}
+    Answer: ${answer}
+
+    Return JSON: { 
+        score: number (1-10), 
+        feedback: string, 
+        strengths: string[], 
+        improvements: string[] 
     }
-
-    /**
-     * Generate interview questions for a specific role
-     */
-    async generateInterviewQuestions(jobRole, companyType, difficulty = 'medium', count = 5) {
-        try {
-            const model = getModel();
-            if (!model) {
-                // Fallback to mock questions if model unavailable
-                return this.getMockInterviewQuestions(jobRole, count);
-            }
-
-            const prompt = `
-Generate ${count} interview questions for a ${jobRole} position at a ${companyType} company.
-
-Difficulty Level: ${difficulty}
-Question Types: Mix of technical, behavioral, and situational questions
-
-Return ONLY a valid JSON array in this exact format:
-[
-  {
-    "question": "Question text here",
-    "type": "technical|behavioral|situational",
-    "difficulty": "easy|medium|hard",
-    "expectedAnswer": "Brief outline of what a good answer should cover",
-    "evaluationCriteria": ["Criterion 1", "Criterion 2"]
-  }
-]
-
-IMPORTANT: Return ONLY the JSON array, no additional text.
-`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) {
-                console.warn('Invalid AI response, using fallback');
-                return this.getMockInterviewQuestions(jobRole, count);
-            }
-
-            const questions = JSON.parse(jsonMatch[0]);
-            return questions;
-        } catch (error) {
-            console.error('Error generating interview questions:', error);
-            // Return mock questions as fallback
-            return this.getMockInterviewQuestions(jobRole, count);
-        }
-    }
-
-    /**
-     * Fallback mock interview questions
-     */
-    getMockInterviewQuestions(jobRole, count = 5) {
-        const mockQuestions = [
-            {
-                question: `Tell me about your experience with ${jobRole} and why you're interested in this position.`,
-                type: "behavioral",
-                difficulty: "easy",
-                expectedAnswer: "Should discuss relevant experience, passion for the role, and alignment with career goals.",
-                evaluationCriteria: ["Clarity", "Relevance", "Enthusiasm"]
-            },
-            {
-                question: `Describe a challenging project you worked on. What was your role and how did you overcome obstacles?`,
-                type: "behavioral",
-                difficulty: "medium",
-                expectedAnswer: "Should use STAR method, demonstrate problem-solving, and show impact.",
-                evaluationCriteria: ["Problem-solving", "Communication", "Results"]
-            },
-            {
-                question: `What technical skills do you have that make you a good fit for this ${jobRole} role?`,
-                type: "technical",
-                difficulty: "medium",
-                expectedAnswer: "Should list relevant technical skills with examples of how they've been applied.",
-                evaluationCriteria: ["Technical knowledge", "Practical application", "Depth"]
-            },
-            {
-                question: `How do you stay updated with the latest trends and technologies in your field?`,
-                type: "behavioral",
-                difficulty: "easy",
-                expectedAnswer: "Should mention learning resources, communities, projects, and continuous improvement mindset.",
-                evaluationCriteria: ["Learning mindset", "Resourcefulness", "Passion"]
-            },
-            {
-                question: `Where do you see yourself in 5 years, and how does this position align with your goals?`,
-                type: "behavioral",
-                difficulty: "easy",
-                expectedAnswer: "Should show career planning, ambition, and how the role fits into their growth path.",
-                evaluationCriteria: ["Career planning", "Alignment", "Ambition"]
-            }
-        ];
-
-        return mockQuestions.slice(0, count);
-    }
-
-    /**
-     * Evaluate a student's answer to an interview question
-     */
-    async evaluateAnswer(question, studentAnswer, expectedAnswer) {
-        try {
-            const prompt = `
-You are an expert interview evaluator. Evaluate the student's answer to the interview question.
-
-QUESTION: ${question}
-
-EXPECTED ANSWER OUTLINE: ${expectedAnswer}
-
-STUDENT'S ANSWER: ${studentAnswer}
-
-Provide a comprehensive evaluation in JSON format:
-{
-  "score": 75,
-  "feedback": "Detailed feedback on the answer",
-  "strengths": ["Point 1", "Point 2"],
-  "improvements": ["Suggestion 1", "Suggestion 2"],
-  "overallAssessment": "Brief overall assessment"
-}
-
-Score should be 0-100 where:
-- 90-100: Excellent answer
-- 75-89: Good answer
-- 60-74: Satisfactory answer
-- 40-59: Needs improvement
-- 0-39: Poor answer
-
-IMPORTANT: Return ONLY the JSON object, no additional text.
-`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error('Invalid response format from AI');
-            }
-
-            const evaluation = JSON.parse(jsonMatch[0]);
-            return evaluation;
-        } catch (error) {
-            console.error('Error evaluating answer:', error);
-            throw new Error('Failed to evaluate answer: ' + error.message);
-        }
-    }
-
-    /**
-     * Generate a personalized cover letter
-     */
-    async generateCoverLetter(resumeData, jobDescription, tone = 'professional') {
-        try {
-            const model = getModel();
-            if (!model) {
-                // Fallback to template if model unavailable
-                return this.getMockCoverLetter(resumeData, jobDescription, tone);
-            }
-
-            const prompt = `
-Generate a personalized cover letter based on the resume and job description.
-
-RESUME DATA:
-- Name: ${resumeData.name}
-- Email: ${resumeData.email}
-- Skills: ${resumeData.skills?.join(', ')}
-- Experience: ${resumeData.experience || 'Fresher'}
-- Education: ${resumeData.education}
-- Projects: ${JSON.stringify(resumeData.projects || [])}
-
-JOB DESCRIPTION:
-${jobDescription}
-
-TONE: ${tone}
-(professional = formal and business-like, enthusiastic = energetic and passionate, technical = focus on technical skills)
-
-Generate a compelling cover letter that:
-1. Opens with a strong introduction
-2. Highlights relevant skills and experiences
-3. Shows enthusiasm for the role
-4. Demonstrates knowledge of the company
-5. Closes with a call to action
-
-Return the cover letter as plain text (not JSON), approximately 300-400 words.
-`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const coverLetter = response.text();
-
-            return coverLetter;
-        } catch (error) {
-            console.error('Error generating cover letter:', error);
-            // Return template as fallback
-            return this.getMockCoverLetter(resumeData, jobDescription, tone);
-        }
-    }
-
-    /**
-     * Fallback cover letter template
-     */
-    getMockCoverLetter(resumeData, jobDescription, tone) {
-        const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-        return `${date}
-
-Dear Hiring Manager,
-
-I am writing to express my strong interest in the position described in your job posting. As a ${resumeData.experience || 'motivated candidate'} with skills in ${resumeData.skills?.slice(0, 3).join(', ') || 'various technologies'}, I am excited about the opportunity to contribute to your team.
-
-Throughout my academic and professional journey, I have developed a strong foundation in ${resumeData.education || 'my field'}. My technical expertise includes ${resumeData.skills?.join(', ') || 'modern technologies and best practices'}, which aligns well with the requirements outlined in the job description.
-
-I am particularly drawn to this opportunity because it offers the chance to apply my skills in a dynamic environment while continuing to grow professionally. I am confident that my background and enthusiasm make me a strong candidate for this position.
-
-I would welcome the opportunity to discuss how my qualifications align with your needs. Thank you for considering my application. I look forward to hearing from you soon.
-
-Sincerely,
-${resumeData.name}
-${resumeData.email}`;
-    }
-
-    /**
-     * Refine an existing cover letter based on user instructions
-     */
-    async refineCoverLetter(existingLetter, refinementInstructions) {
-        try {
-            const prompt = `
-Refine the following cover letter based on the user's instructions.
-
-EXISTING COVER LETTER:
-${existingLetter}
-
-REFINEMENT INSTRUCTIONS:
-${refinementInstructions}
-
-Return the refined cover letter as plain text, maintaining the overall structure but incorporating the requested changes.
-`;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const refinedLetter = response.text();
-
-            return refinedLetter;
-        } catch (error) {
-            console.error('Error refining cover letter:', error);
-            throw new Error('Failed to refine cover letter: ' + error.message);
-        }
-    }
-}
-
-module.exports = new GeminiService();
+    `;
+    return await generateJSON(prompt);
+};

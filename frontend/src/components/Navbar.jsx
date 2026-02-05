@@ -1,20 +1,12 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Briefcase, User, LogOut, LayoutDashboard, Bell, Bookmark, ChevronDown, GraduationCap, BookOpen, Trophy, Building2, TrendingUp, Calendar, Sparkles, Brain, FileText } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
-
-    // Use state for token and user so they update reactively
-    const [token, setToken] = useState(localStorage.getItem('token'));
-    const [user, setUser] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem('user') || '{}');
-        } catch {
-            return {};
-        }
-    });
+    const { user, logout } = useAuth();
 
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showPrepMenu, setShowPrepMenu] = useState(false);
@@ -27,46 +19,37 @@ const Navbar = () => {
     const resourcesRef = useRef(null);
     const aiRef = useRef(null);
 
-    // Function to update auth state
-    const updateAuthState = () => {
-        const newToken = localStorage.getItem('token');
-        const newUserStr = localStorage.getItem('user');
+    // Timeout refs for grace period
+    const prepTimeoutRef = useRef(null);
+    const resourcesTimeoutRef = useRef(null);
+    const aiTimeoutRef = useRef(null);
 
-        setToken(newToken);
-        try {
-            setUser(newUserStr ? JSON.parse(newUserStr) : {});
-        } catch {
-            setUser({});
+    // Handlers with grace period
+    const handleMouseEnter = (menu) => {
+        if (menu === 'prep') {
+            if (prepTimeoutRef.current) clearTimeout(prepTimeoutRef.current);
+            setShowPrepMenu(true);
+        } else if (menu === 'resources') {
+            if (resourcesTimeoutRef.current) clearTimeout(resourcesTimeoutRef.current);
+            setShowResourcesMenu(true);
+        } else if (menu === 'ai') {
+            if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
+            setShowAIMenu(true);
         }
     };
 
-    // Update token and user when location changes (after login/logout)
-    useEffect(() => {
-        updateAuthState();
-    }, [location.pathname]);
-
-    // Listen for storage changes and window focus
-    useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === 'token' || e.key === 'user' || e.key === null) {
-                updateAuthState();
-            }
-        };
-
-        window.addEventListener('storage', handleStorageChange);
-        window.addEventListener('focus', updateAuthState);
-
-        return () => {
-            window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener('focus', updateAuthState);
-        };
-    }, []);
+    const handleMouseLeave = (menu) => {
+        if (menu === 'prep') {
+            prepTimeoutRef.current = setTimeout(() => setShowPrepMenu(false), 300);
+        } else if (menu === 'resources') {
+            resourcesTimeoutRef.current = setTimeout(() => setShowResourcesMenu(false), 300);
+        } else if (menu === 'ai') {
+            aiTimeoutRef.current = setTimeout(() => setShowAIMenu(false), 300);
+        }
+    };
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setToken(null);
-        setUser({});
+        logout();
         navigate('/login');
     };
 
@@ -104,8 +87,8 @@ const Navbar = () => {
     }, [location.pathname]);
 
     return (
-        <nav className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 text-white p-4 sticky top-0 z-50 backdrop-blur-lg shadow-lg">
-            <div className="container mx-auto">
+        <nav className="fixed top-0 w-full z-50 glass-panel border-b border-slate-700/50">
+            <div className="container mx-auto px-6 py-3">
                 {/* Top Row */}
                 <div className="flex justify-between items-center">
                     {/* Logo */}
@@ -123,7 +106,7 @@ const Navbar = () => {
 
                     {/* Right Side */}
                     <div className="flex items-center space-x-6">
-                        {token ? (
+                        {user ? (
                             <>
                                 {/* Notifications */}
                                 <button className="relative hover:text-blue-400 transition group">
@@ -207,11 +190,11 @@ const Navbar = () => {
                 </div>
 
                 {/* Bottom Row - Navigation */}
-                {token && (
-                    <div className="flex items-center space-x-1 mt-4 border-t border-slate-700 pt-3">
+                {user && (
+                    <div className="flex items-center space-x-1 mt-4 border-t border-slate-700/50 pt-3 overflow-x-auto md:overflow-visible pb-2 scrollbar-none">
                         <Link
-                            to="/dashboard"
-                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${isActive('/dashboard') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
+                            to={user.role === 'company' ? '/company-dashboard' : '/dashboard'}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition whitespace-nowrap ${isActive('/dashboard') || isActive('/company-dashboard') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
                                 }`}
                         >
                             <LayoutDashboard size={18} />
@@ -237,7 +220,7 @@ const Navbar = () => {
                         </Link>
 
                         {/* AI Tools Mega Menu */}
-                        <div className="relative" ref={aiRef}>
+                        <div className="relative" ref={aiRef} onMouseEnter={() => handleMouseEnter('ai')} onMouseLeave={() => handleMouseLeave('ai')}>
                             <button
                                 onClick={() => setShowAIMenu(!showAIMenu)}
                                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showAIMenu ? 'bg-purple-600/20 border border-purple-500/50' : 'hover:bg-slate-800'
@@ -310,7 +293,7 @@ const Navbar = () => {
                         </div>
 
                         {/* Preparation Mega Menu */}
-                        <div className="relative" ref={prepRef}>
+                        <div className="relative" ref={prepRef} onMouseEnter={() => handleMouseEnter('prep')} onMouseLeave={() => handleMouseLeave('prep')}>
                             <button
                                 onClick={() => setShowPrepMenu(!showPrepMenu)}
                                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showPrepMenu ? 'bg-slate-800' : 'hover:bg-slate-800'
@@ -363,7 +346,7 @@ const Navbar = () => {
                         </div>
 
                         {/* Resources Mega Menu */}
-                        <div className="relative" ref={resourcesRef}>
+                        <div className="relative" ref={resourcesRef} onMouseEnter={() => handleMouseEnter('resources')} onMouseLeave={() => handleMouseLeave('resources')}>
                             <button
                                 onClick={() => setShowResourcesMenu(!showResourcesMenu)}
                                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showResourcesMenu ? 'bg-slate-800' : 'hover:bg-slate-800'

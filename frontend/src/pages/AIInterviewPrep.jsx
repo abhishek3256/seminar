@@ -30,7 +30,7 @@ const AIInterviewPrep = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/interview/start-session', {
+            const response = await fetch('http://localhost:5001/api/ai/interview-prep/questions', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -69,7 +69,7 @@ const AIInterviewPrep = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/interview/submit-answer', {
+            const response = await fetch('http://localhost:5001/api/ai/interview/submit-answer', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -115,7 +115,7 @@ const AIInterviewPrep = () => {
     const currentQuestion = questions[currentQuestionIndex];
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-12">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-12">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border-b border-slate-800 p-8">
                 <div className="max-w-4xl mx-auto">
@@ -172,8 +172,8 @@ const AIInterviewPrep = () => {
                                             key={level}
                                             onClick={() => setDifficulty(level)}
                                             className={`px-4 py-3 rounded-lg capitalize transition ${difficulty === level
-                                                    ? 'bg-purple-600 text-white'
-                                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                                 }`}
                                         >
                                             {level}

@@ -19,7 +19,7 @@ const JobRecommendations = () => {
             setError(null);
 
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/job-recommendations', {
+            const response = await fetch('http://localhost:5001/api/ai/job-recommendations', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -55,7 +55,7 @@ const JobRecommendations = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-20">
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-40">
                 <div className="text-center">
                     <Loader className="animate-spin h-16 w-16 text-purple-500 mx-auto mb-4" />
                     <p className="text-white text-xl">Analyzing your profile...</p>
@@ -67,7 +67,7 @@ const JobRecommendations = () => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-20 p-8">
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-40 p-8">
                 <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-8 max-w-2xl text-center">
                     <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
                     <h1 className="text-2xl font-bold text-white mb-4">Error Loading Recommendations</h1>
@@ -84,7 +84,7 @@ const JobRecommendations = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20">
+        <div className="min-h-screen bg-slate-950 text-white pt-40">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-slate-800 p-8">
                 <div className="max-w-7xl mx-auto">
@@ -109,8 +109,8 @@ const JobRecommendations = () => {
                             <button
                                 onClick={() => setFilter('all')}
                                 className={`px-4 py-2 rounded-lg transition ${filter === 'all'
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                     }`}
                             >
                                 All ({recommendations.length})
@@ -118,8 +118,8 @@ const JobRecommendations = () => {
                             <button
                                 onClick={() => setFilter('high')}
                                 className={`px-4 py-2 rounded-lg transition ${filter === 'high'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                     }`}
                             >
                                 High Match (75%+)
@@ -127,8 +127,8 @@ const JobRecommendations = () => {
                             <button
                                 onClick={() => setFilter('medium')}
                                 className={`px-4 py-2 rounded-lg transition ${filter === 'medium'
-                                        ? 'bg-yellow-600 text-white'
-                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    ? 'bg-yellow-600 text-white'
+                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                     }`}
                             >
                                 Medium Match (50-74%)
@@ -136,8 +136,8 @@ const JobRecommendations = () => {
                             <button
                                 onClick={() => setFilter('low')}
                                 className={`px-4 py-2 rounded-lg transition ${filter === 'low'
-                                        ? 'bg-orange-600 text-white'
-                                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                    ? 'bg-orange-600 text-white'
+                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                     }`}
                             >
                                 Lower Match (&lt;50%)

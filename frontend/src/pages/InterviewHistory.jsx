@@ -15,7 +15,7 @@ const InterviewHistory = () => {
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/interview/history', {
+            const response = await fetch('http://localhost:5001/api/ai/interview-history', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -41,14 +41,14 @@ const InterviewHistory = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-20">
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center pt-40">
                 <Loader className="animate-spin h-16 w-16 text-purple-500" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-12">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-12">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border-b border-slate-800 p-8">
                 <div className="max-w-7xl mx-auto">

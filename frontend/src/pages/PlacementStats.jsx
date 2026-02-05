@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 const PlacementStats = () => {
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-8 px-8">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">

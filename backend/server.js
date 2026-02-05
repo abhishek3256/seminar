@@ -3,7 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 
 // Import Models
 const User = require('./models/User');
@@ -13,48 +12,83 @@ const Job = require('./models/Job');
 const Application = require('./models/Application');
 
 // Import Middleware
-const { protect } = require('./middleware/auth');
+const { authenticate } = require('./middleware/auth');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123";
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Root route for health check
+app.get('/', (req, res) => {
+  res.send('CampusAI Backend is Running');
+});
+
 // Database Connection
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/campusplacement')
   .then(() => console.log('✅ MongoDB Connected: campusplacement'))
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // --- ROUTES ---
-app.use('/api/resume', require('./routes/resumeRoutes'));
+// Mount Student Routes
+app.use('/api/student', require('./routes/studentRoutes'));
+// Mount Company Routes
+app.use('/api/company', require('./routes/companyRoutes'));
+// Mount Admin Routes
 app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/ai', require('./routes/aiRoutes'));
+// Mount Assessment Routes
+app.use('/api/assessment', require('./routes/assessmentRoutes'));
 
-
-// 1. Auth Routes
+// Auth Routes (Minimal implementation for testing)
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { email, password, role } = req.body;
 
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ message: "User already exists" });
 
-    user = new User({ name, email, password, role });
+    user = new User({ email, password, role });
     await user.save();
 
     // Create specific profile based on role
+    // Note: This is partial, real flow should happen in specific controllers
     if (role === 'student') {
-      await Student.create({ user: user._id });
+      const { fullName, phone } = req.body; // Expect these in body
+      if (fullName && phone) {
+        await Student.create({
+          userId: user._id,
+          fullName,
+          phone
+        });
+      }
     } else if (role === 'company') {
-      await Company.create({ user: user._id, industry: "Technology" }); // Default
+      const { companyName, companyEmail } = req.body;
+      if (companyName && companyEmail)
+        await Company.create({
+          userId: user._id,
+          companyName,
+          companyEmail
+        });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-    res.status(201).json({ token, user: { id: user._id, name, email, role } });
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    res.status(201).json({ token, user: { id: user._id, email, role } });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -66,41 +100,11 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
-    const isMatch = await user.matchPassword(password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 2. Dashboard Stats Route (Protected - requires authentication)
-app.get('/api/dashboard/stats', protect, async (req, res) => {
-  try {
-    const students = await Student.countDocuments();
-    const companies = await Company.countDocuments();
-    const jobs = await Job.countDocuments();
-    const applications = await Application.countDocuments();
-
-    // Get recent jobs
-    const recentJobs = await Job.find().sort({ postedAt: -1 }).limit(5).populate('company', 'name location');
-
-    res.json({
-      stats: { students, companies, jobs, applications },
-      recentJobs
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 3. Jobs Route (Protected - requires authentication)
-app.get('/api/jobs', protect, async (req, res) => {
-  try {
-    const jobs = await Job.find().populate('company', 'name location industry');
-    res.json(jobs);
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token, user: { id: user._id, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

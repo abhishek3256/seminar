@@ -1,35 +1,23 @@
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-    // Simplified - just check if user is logged in
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
+    const { user, loading } = useAuth();
 
-    console.log('🔒 ProtectedRoute Check:', {
-        hasToken: !!token,
-        hasUser: !!userStr,
-        allowedRoles
-    });
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-950">
+                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+            </div>
+        );
+    }
 
-    // Not logged in - redirect to login
-    if (!token || !userStr) {
-        console.log('❌ Not logged in - redirecting to /login');
+    if (!user) {
         return <Navigate to="/login" replace />;
     }
 
-    // Parse user data
-    let user;
-    try {
-        user = JSON.parse(userStr);
-        console.log('✅ User logged in:', user.email, 'Role:', user.role);
-    } catch (error) {
-        console.error('❌ Error parsing user data:', error);
-        return <Navigate to="/login" replace />;
-    }
-
-    // Check role if required
     if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-        console.log('🚫 Access denied - wrong role');
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
                 <div className="bg-slate-900 border border-red-500/50 rounded-xl p-8 max-w-md text-center">
@@ -38,9 +26,6 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
                     <p className="text-slate-400 mb-6">
                         You don't have permission to access this page.
                         Required role: <span className="text-red-400 font-semibold">{allowedRoles.join(', ')}</span>
-                    </p>
-                    <p className="text-slate-500 text-sm">
-                        Your role: <span className="text-blue-400">{user.role || 'Not assigned'}</span>
                     </p>
                     <button
                         onClick={() => window.history.back()}
@@ -53,8 +38,6 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
         );
     }
 
-    // User is authenticated and authorized - render children
-    console.log('✅ Access granted - rendering page');
     return children;
 };
 

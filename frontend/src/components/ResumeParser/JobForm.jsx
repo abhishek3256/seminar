@@ -275,7 +275,7 @@ const JobForm = ({ onSubmit, initialData }) => {
         setIsGenerating(true);
 
         try {
-            const response = await axios.post('http://localhost:5000/api/resume/generate-description', {
+            const response = await axios.post('http://localhost:5001/api/resume/generate-description', {
                 jobTitle: formData.jobTitle,
                 requiredSkills: formData.requiredSkills,
                 experienceLevel: formData.experienceLevel

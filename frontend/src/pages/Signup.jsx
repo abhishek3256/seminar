@@ -1,100 +1,113 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Lock, Briefcase } from 'lucide-react';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { Lock, Mail, User, Loader2, Building2 } from 'lucide-react';
 
 const Signup = () => {
-    const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'student' });
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        role: 'student' // Default role
+    });
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { register } = useAuth();
     const navigate = useNavigate();
-
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        try {
-            const res = await fetch('http://localhost:5000/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            const data = await res.json();
+        setError('');
+        setIsLoading(true);
 
-            if (!res.ok) throw new Error(data.message || 'Signup failed');
+        // Pass correct payload to context
+        const result = await register(formData);
 
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-
-            // Force a full page reload to ensure Navbar updates
-            window.location.href = '/dashboard';
-        } catch (err) {
-            setError(err.message);
+        if (result.success) {
+            navigate('/dashboard');
+        } else {
+            setError(result.message);
         }
+        setIsLoading(false);
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="bg-slate-900 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-800">
-                <h2 className="text-3xl font-bold text-white mb-6 text-center">Create Account</h2>
-                {error && <div className="bg-red-500/10 text-red-500 p-3 rounded mb-4 text-center">{error}</div>}
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+                <div className="text-center">
+                    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Create your account</h2>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-slate-400 mb-1 ml-1">Full Name</label>
+                {error && (
+                    <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                    <div className="flex justify-center space-x-4 mb-4">
+                        <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, role: 'student' })}
+                            className={`px-4 py-2 rounded-md text-sm font-medium ${formData.role === 'student'
+                                    ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-700'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            Student
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, role: 'company' })}
+                            className={`px-4 py-2 rounded-md text-sm font-medium ${formData.role === 'company'
+                                    ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-700'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            Company
+                        </button>
+                    </div>
+
+                    <div className="rounded-md shadow-sm -space-y-px">
                         <div className="relative">
-                            <User className="absolute left-3 top-3 text-slate-500" size={18} />
+                            <Mail className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
                             <input
-                                type="text" name="name" required
-                                className="w-full bg-slate-800 text-white rounded-lg pl-10 pr-4 py-2 border border-slate-700 focus:outline-none focus:border-blue-500"
-                                placeholder="John Doe"
-                                onChange={handleChange}
+                                type="email"
+                                required
+                                className="appearance-none rounded-none relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                placeholder="Email address"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="relative">
+                            <Lock className="absolute top-3 left-3 h-5 w-5 text-gray-400" />
+                            <input
+                                type="password"
+                                required
+                                className="appearance-none rounded-none relative block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                                placeholder="Password"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             />
                         </div>
                     </div>
+
                     <div>
-                        <label className="block text-slate-400 mb-1 ml-1">Email</label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 text-slate-500" size={18} />
-                            <input
-                                type="email" name="email" required
-                                className="w-full bg-slate-800 text-white rounded-lg pl-10 pr-4 py-2 border border-slate-700 focus:outline-none focus:border-blue-500"
-                                placeholder="you@example.com"
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : 'Sign up'}
+                        </button>
                     </div>
-                    <div>
-                        <label className="block text-slate-400 mb-1 ml-1">Password</label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-3 text-slate-500" size={18} />
-                            <input
-                                type="password" name="password" required
-                                className="w-full bg-slate-800 text-white rounded-lg pl-10 pr-4 py-2 border border-slate-700 focus:outline-none focus:border-blue-500"
-                                placeholder="••••••••"
-                                onChange={handleChange}
-                            />
-                        </div>
+
+                    <div className="text-sm text-center">
+                        <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+                            Already have an account? Sign in
+                        </Link>
                     </div>
-                    <div>
-                        <label className="block text-slate-400 mb-1 ml-1">Role</label>
-                        <div className="relative">
-                            <Briefcase className="absolute left-3 top-3 text-slate-500" size={18} />
-                            <select
-                                name="role"
-                                className="w-full bg-slate-800 text-white rounded-lg pl-10 pr-4 py-2 border border-slate-700 focus:outline-none focus:border-blue-500 appearance-none"
-                                onChange={handleChange}
-                            >
-                                <option value="student">Student</option>
-                                <option value="company">Company</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition mt-4">
-                        Sign Up
-                    </button>
                 </form>
-                <p className="text-slate-400 text-center mt-6">
-                    Already have an account? <Link to="/login" className="text-blue-400 hover:underline">Login</Link>
-                </p>
             </div>
         </div>
     );

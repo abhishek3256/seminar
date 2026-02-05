@@ -46,7 +46,7 @@ const QuizAttempt = () => {
     if (isSubmitted) {
         const score = calculateScore();
         return (
-            <div className="min-h-screen bg-slate-950 text-white pt-20 pb-8 px-8">
+            <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
                 <div className="max-w-4xl mx-auto">
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
                         <h1 className="text-4xl font-bold mb-4">Quiz Completed!</h1>
@@ -102,8 +102,8 @@ const QuizAttempt = () => {
                                                 <div
                                                     key={i}
                                                     className={`p-3 rounded-lg ${i === q.correctAnswer ? 'bg-green-500/20 border border-green-500' :
-                                                            i === answers[q.id] && i !== q.correctAnswer ? 'bg-red-500/20 border border-red-500' :
-                                                                'bg-slate-800'
+                                                        i === answers[q.id] && i !== q.correctAnswer ? 'bg-red-500/20 border border-red-500' :
+                                                            'bg-slate-800'
                                                         }`}
                                                 >
                                                     {option}
@@ -126,7 +126,7 @@ const QuizAttempt = () => {
     const question = questions[currentQuestion];
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-8 px-8">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
@@ -159,8 +159,8 @@ const QuizAttempt = () => {
                                 key={index}
                                 onClick={() => handleAnswer(question.id, index)}
                                 className={`w-full text-left p-4 rounded-lg transition ${answers[question.id] === index
-                                        ? 'bg-blue-600 border-2 border-blue-400'
-                                        : 'bg-slate-800 hover:bg-slate-700 border-2 border-transparent'
+                                    ? 'bg-blue-600 border-2 border-blue-400'
+                                    : 'bg-slate-800 hover:bg-slate-700 border-2 border-transparent'
                                     }`}
                             >
                                 <span className="font-medium">{String.fromCharCode(65 + index)}.</span> {option}

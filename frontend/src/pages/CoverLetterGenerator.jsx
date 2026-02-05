@@ -18,7 +18,7 @@ const CoverLetterGenerator = () => {
     const fetchJobs = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/jobs', {
+            const response = await fetch('http://localhost:5001/api/jobs', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -42,7 +42,7 @@ const CoverLetterGenerator = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/cover-letter/generate', {
+            const response = await fetch('http://localhost:5001/api/ai/cover-letter/generate', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -78,7 +78,7 @@ const CoverLetterGenerator = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:5000/api/ai/cover-letter/refine', {
+            const response = await fetch('http://localhost:5001/api/ai/cover-letter/refine', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -121,7 +121,7 @@ const CoverLetterGenerator = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-12">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-12">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-b border-slate-800 p-8">
                 <div className="max-w-7xl mx-auto">
@@ -177,8 +177,8 @@ const CoverLetterGenerator = () => {
                                             key={t}
                                             onClick={() => setTone(t)}
                                             className={`px-4 py-3 rounded-lg capitalize transition ${tone === t
-                                                    ? 'bg-purple-600 text-white'
-                                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                                ? 'bg-purple-600 text-white'
+                                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                                                 }`}
                                         >
                                             {t}

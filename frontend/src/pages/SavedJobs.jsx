@@ -17,7 +17,7 @@ const SavedJobs = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-8 px-8">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">

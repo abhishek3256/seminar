@@ -79,7 +79,7 @@ const ResumeUpload = ({ jobData, onAnalysisComplete, onBack }) => {
         try {
             // Assuming existing backend is on port 5000 or proxied
             // Adjust URL if needed based on your setup
-            const response = await axios.post('http://localhost:5000/api/resume/analyze', formData, {
+            const response = await axios.post('http://localhost:5001/api/resume/analyze', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

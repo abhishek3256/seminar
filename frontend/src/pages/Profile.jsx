@@ -1,32 +1,83 @@
-import { useState } from 'react';
-import { User, Mail, Phone, MapPin, Briefcase, Calendar, Edit2, Save } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Mail, Phone, MapPin, Briefcase, Calendar, Edit2, Save, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import api from '../api/axios';
 
 const Profile = () => {
     const [isEditing, setIsEditing] = useState(false);
-    const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || '{}'));
+    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState({});
+
+    // Form state - initially empty, filled on load
     const [formData, setFormData] = useState({
-        name: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '+91 98765 43210',
-        location: user.location || 'Bangalore, India',
-        role: user.role || 'Full Stack Developer',
-        experience: user.experience || '3 years',
-        bio: user.bio || 'Passionate developer with expertise in modern web technologies.',
-        skills: user.skills || 'React, Node.js, MongoDB, Python, AWS'
+        fullName: '',
+        email: '',
+        phone: '',
+        branch: '',
+        skills: '',
+        bio: ''
     });
 
-    const handleSave = () => {
-        const updatedUser = { ...user, ...formData };
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        setIsEditing(false);
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const res = await api.get('/student/profile');
+                if (res.data.success) {
+                    const student = res.data.data;
+                    setUser(student); // Store full student object
+
+                    // Populate form
+                    setFormData({
+                        fullName: student.fullName || '',
+                        email: student.userId?.email || '', // Depending on how populate works, might be student.userId.email
+                        phone: student.phone || '',
+                        branch: student.branch || '',
+                        skills: Array.isArray(student.skills) ? student.skills.join(', ') : (student.skills || ''),
+                        bio: student.bio || ''
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch profile", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchProfile();
+    }, []);
+
+    const handleSave = async () => {
+        try {
+            // Convert skills string back to array if needed by backend, but backend logic allows update
+            // Check studentController updateProfile logic. It takes raw body.
+            // If skills expected as array, split.
+            const payload = {
+                ...formData,
+                skills: formData.skills.split(',').map(s => s.trim())
+            };
+
+            const res = await api.put('/student/profile', payload);
+
+            if (res.data.success) {
+                setUser(res.data.data);
+                setIsEditing(false);
+            }
+        } catch (error) {
+            console.error("Failed to update profile", error);
+            alert("Failed to update profile");
+        }
     };
 
-    const savedJobs = JSON.parse(localStorage.getItem('savedJobs') || '[]');
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-500 w-8 h-8" />
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-20 pb-8 px-8">
+        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
@@ -45,10 +96,10 @@ const Profile = () => {
                     >
                         <div className="text-center">
                             <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-4xl font-bold">{formData.name?.charAt(0) || 'U'}</span>
+                                <span className="text-4xl font-bold">{formData.fullName?.charAt(0) || 'U'}</span>
                             </div>
-                            <h2 className="text-2xl font-bold mb-1">{formData.name}</h2>
-                            <p className="text-slate-400 mb-4">{formData.role}</p>
+                            <h2 className="text-2xl font-bold mb-1">{formData.fullName}</h2>
+                            <p className="text-slate-400 mb-4">{formData.branch ? `${formData.branch} Student` : 'Student'}</p>
 
                             <div className="space-y-3 text-sm text-left">
                                 <div className="flex items-center gap-2 text-slate-400">
@@ -60,12 +111,8 @@ const Profile = () => {
                                     <span>{formData.phone}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-slate-400">
-                                    <MapPin size={16} />
-                                    <span>{formData.location}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-400">
                                     <Briefcase size={16} />
-                                    <span>{formData.experience}</span>
+                                    <span>{user.rollNumber || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>
@@ -93,19 +140,8 @@ const Profile = () => {
                                 <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
                                 <input
                                     type="text"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    disabled={!isEditing}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    value={formData.fullName}
+                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                     disabled={!isEditing}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                                 />
@@ -123,34 +159,11 @@ const Profile = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-400 mb-2">Location</label>
+                                    <label className="block text-sm font-medium text-slate-400 mb-2">Branch</label>
                                     <input
                                         type="text"
-                                        value={formData.location}
-                                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                        disabled={!isEditing}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-400 mb-2">Role</label>
-                                    <input
-                                        type="text"
-                                        value={formData.role}
-                                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                        disabled={!isEditing}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-400 mb-2">Experience</label>
-                                    <input
-                                        type="text"
-                                        value={formData.experience}
-                                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                                        value={formData.branch}
+                                        onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
                                         disabled={!isEditing}
                                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
                                     />
@@ -182,50 +195,6 @@ const Profile = () => {
                         </div>
                     </motion.div>
                 </div>
-
-                {/* Stats */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6"
-                >
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-slate-400 text-sm">Saved Jobs</p>
-                                <p className="text-3xl font-bold text-blue-400 mt-1">{savedJobs.length}</p>
-                            </div>
-                            <div className="p-3 bg-blue-500/20 rounded-lg">
-                                <Briefcase className="text-blue-400" size={24} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-slate-400 text-sm">Applications</p>
-                                <p className="text-3xl font-bold text-green-400 mt-1">12</p>
-                            </div>
-                            <div className="p-3 bg-green-500/20 rounded-lg">
-                                <Calendar className="text-green-400" size={24} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-slate-400 text-sm">Profile Views</p>
-                                <p className="text-3xl font-bold text-purple-400 mt-1">47</p>
-                            </div>
-                            <div className="p-3 bg-purple-500/20 rounded-lg">
-                                <User className="text-purple-400" size={24} />
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
             </div>
         </div>
     );
