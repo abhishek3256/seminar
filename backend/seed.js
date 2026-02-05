@@ -28,7 +28,17 @@ const seedData = async () => {
         await Application.deleteMany({});
         console.log("🗑️  Cleared existing data");
 
-        // 1. Create Users (Students)
+        // 1. Create Admin User
+        const adminUser = new User({
+            name: 'Admin User',
+            email: 'admin@example.com',
+            password: 'Admin@2024#Secure', // Strong password: uppercase, lowercase, numbers, symbols
+            role: 'admin'
+        });
+        await adminUser.save();
+        console.log('✅ Admin user created');
+
+        // 2. Create Users (Students)
         const studentsData = [
             { name: "Aarav Sharma", email: "aarav@example.com", text: "AS", skills: ["React", "Node.js", "Python"], branch: "CSE" },
             { name: "Sneha Patel", email: "sneha@example.com", text: "SP", skills: ["Java", "SQL", "Spring Boot"], branch: "IT" },
@@ -37,7 +47,7 @@ const seedData = async () => {
             { name: "Vikram Malhotra", email: "vikram@example.com", text: "VM", skills: ["Python", "ML", "TensorFlow"], branch: "CSE" },
         ];
 
-        const student users = [];
+        const studentUsers = [];
         const studentsModels = [];
 
         for (const s of studentsData) {
@@ -61,7 +71,7 @@ const seedData = async () => {
         }
         console.log(`✅ Created ${studentsData.length} Students`);
 
-        // 2. Create Users (Companies)
+        // 3. Create Users (Companies)
         const companiesData = [
             { name: "TechCorp India", email: "hr@techcorp.com", industry: "IT Services", location: "Bangalore" },
             { name: "InnovateAI", email: "jobs@innovateai.com", industry: "Artificial Intelligence", location: "Hyderabad" },
@@ -90,7 +100,7 @@ const seedData = async () => {
         }
         console.log(`✅ Created ${companiesData.length} Companies`);
 
-        // 3. Create Jobs
+        // 4. Create Jobs
         const jobsData = [
             { title: "SDE-1", desc: "Junior Software Developer role.", type: "Full-time", salary: "12-15 LPA" },
             { title: "Frontend Intern", desc: "React.js internship.", type: "Internship", salary: "25k/month" },
@@ -122,7 +132,7 @@ const seedData = async () => {
         }
         console.log(`✅ Created ${jobModels.length} Jobs`);
 
-        // 4. Create Applications
+        // 5. Create Applications
         for (const student of studentsModels) {
             // Each student applies to 2-3 jobs
             const numApps = Math.floor(Math.random() * 3) + 2;

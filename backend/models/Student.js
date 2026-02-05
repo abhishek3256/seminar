@@ -10,6 +10,15 @@ const studentSchema = new mongoose.Schema({
     githubLink: { type: String },
     linkedinLink: { type: String },
     branch: { type: String },
+    // AI Features - Job Recommendations
+    interests: [{ type: String }], // Career interests
+    experience: { type: String, default: 'Fresher' }, // Work experience description
+    preferences: {
+        location: [{ type: String }], // Preferred job locations
+        salary: { type: String }, // Expected salary range
+        jobType: { type: String, enum: ['Full-time', 'Internship', 'Part-time', 'Contract'], default: 'Full-time' },
+        industry: [{ type: String }] // Preferred industries
+    }
 });
 
 module.exports = mongoose.model('Student', studentSchema);
