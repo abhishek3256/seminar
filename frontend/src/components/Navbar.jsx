@@ -8,43 +8,35 @@ const Navbar = () => {
     const location = useLocation();
     const { user, logout } = useAuth();
 
-    const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [showPrepMenu, setShowPrepMenu] = useState(false);
-    const [showResourcesMenu, setShowResourcesMenu] = useState(false);
-    const [showAIMenu, setShowAIMenu] = useState(false);
+    // Single state for active menu to ensure mutual exclusivity
+    const [activeMenu, setActiveMenu] = useState(null);
+    const [showProfileMenu, setShowProfileMenu] = useState(false); // Keep profile separate as it's structurally different
 
     // Refs for dropdown containers
     const profileRef = useRef(null);
-    const prepRef = useRef(null);
-    const resourcesRef = useRef(null);
-    const aiRef = useRef(null);
+    const navRef = useRef(null); // Ref for the navigation container
 
-    // Timeout refs for grace period
-    const prepTimeoutRef = useRef(null);
-    const resourcesTimeoutRef = useRef(null);
-    const aiTimeoutRef = useRef(null);
+    // Timeout ref for grace period
+    const timeoutRef = useRef(null);
 
-    // Handlers with grace period
+    // Handlers
     const handleMouseEnter = (menu) => {
-        if (menu === 'prep') {
-            if (prepTimeoutRef.current) clearTimeout(prepTimeoutRef.current);
-            setShowPrepMenu(true);
-        } else if (menu === 'resources') {
-            if (resourcesTimeoutRef.current) clearTimeout(resourcesTimeoutRef.current);
-            setShowResourcesMenu(true);
-        } else if (menu === 'ai') {
-            if (aiTimeoutRef.current) clearTimeout(aiTimeoutRef.current);
-            setShowAIMenu(true);
-        }
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setActiveMenu(menu);
     };
 
-    const handleMouseLeave = (menu) => {
-        if (menu === 'prep') {
-            prepTimeoutRef.current = setTimeout(() => setShowPrepMenu(false), 300);
-        } else if (menu === 'resources') {
-            resourcesTimeoutRef.current = setTimeout(() => setShowResourcesMenu(false), 300);
-        } else if (menu === 'ai') {
-            aiTimeoutRef.current = setTimeout(() => setShowAIMenu(false), 300);
+    const handleMouseLeave = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+            setActiveMenu(null);
+        }, 100); // Faster collapse delay (100ms vs 300ms)
+    };
+
+    const toggleMenu = (menu) => {
+        if (activeMenu === menu) {
+            setActiveMenu(null);
+        } else {
+            setActiveMenu(menu);
         }
     };
 
@@ -61,14 +53,8 @@ const Navbar = () => {
             if (profileRef.current && !profileRef.current.contains(event.target)) {
                 setShowProfileMenu(false);
             }
-            if (prepRef.current && !prepRef.current.contains(event.target)) {
-                setShowPrepMenu(false);
-            }
-            if (resourcesRef.current && !resourcesRef.current.contains(event.target)) {
-                setShowResourcesMenu(false);
-            }
-            if (aiRef.current && !aiRef.current.contains(event.target)) {
-                setShowAIMenu(false);
+            if (navRef.current && !navRef.current.contains(event.target)) {
+                setActiveMenu(null);
             }
         };
 
@@ -81,13 +67,14 @@ const Navbar = () => {
     // Close all menus when navigating
     useEffect(() => {
         setShowProfileMenu(false);
-        setShowPrepMenu(false);
-        setShowResourcesMenu(false);
-        setShowAIMenu(false);
+        setActiveMenu(null);
     }, [location.pathname]);
 
+    const displayName = user?.fullName || user?.companyName || user?.name || user?.email || 'User';
+    const displayInitial = displayName?.charAt(0)?.toUpperCase() || 'U';
+
     return (
-        <nav className="fixed top-0 w-full z-50 glass-panel border-b border-slate-700/50">
+        <nav className="fixed top-0 w-full z-[100] glass-panel border-b border-slate-700/50">
             <div className="container mx-auto px-6 py-3">
                 {/* Top Row */}
                 <div className="flex justify-between items-center">
@@ -121,16 +108,16 @@ const Navbar = () => {
                                         className="flex items-center space-x-2 bg-slate-800/50 px-3 py-2 rounded-lg hover:bg-slate-700 transition border border-slate-700"
                                     >
                                         <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-sm font-bold">{user.name?.charAt(0) || 'U'}</span>
+                                            <span className="text-sm font-bold">{displayInitial}</span>
                                         </div>
-                                        <span className="hidden md:block font-medium">{user.name || 'User'}</span>
-                                        <ChevronDown size={16} className={`transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                                        <span className="hidden md:block font-medium">{displayName}</span>
+                                        <ChevronDown size={16} className={`transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {showProfileMenu && (
-                                        <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden">
+                                        <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[101]">
                                             <div className="px-4 py-3 border-b border-slate-700">
-                                                <p className="text-sm font-medium">{user.name}</p>
+                                                <p className="text-sm font-medium">{displayName}</p>
                                                 <p className="text-xs text-slate-400">{user.email}</p>
                                             </div>
                                             <Link
@@ -191,9 +178,14 @@ const Navbar = () => {
 
                 {/* Bottom Row - Navigation */}
                 {user && (
-                    <div className="flex items-center space-x-1 mt-4 border-t border-slate-700/50 pt-3 overflow-x-auto md:overflow-visible pb-2 scrollbar-none">
+                    <div
+                        ref={navRef}
+                        className="flex items-center space-x-1 mt-4 border-t border-slate-700/50 pt-3 overflow-visible pb-2"
+                        onMouseLeave={handleMouseLeave}
+                    >
                         <Link
                             to={user.role === 'company' ? '/company-dashboard' : '/dashboard'}
+                            onMouseEnter={() => setActiveMenu(null)}
                             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition whitespace-nowrap ${isActive('/dashboard') || isActive('/company-dashboard') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
                                 }`}
                         >
@@ -203,6 +195,7 @@ const Navbar = () => {
 
                         <Link
                             to="/jobs"
+                            onMouseEnter={() => setActiveMenu(null)}
                             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${isActive('/jobs') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
                                 }`}
                         >
@@ -212,6 +205,7 @@ const Navbar = () => {
 
                         <Link
                             to="/saved-jobs"
+                            onMouseEnter={() => setActiveMenu(null)}
                             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${isActive('/saved-jobs') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
                                 }`}
                         >
@@ -220,19 +214,19 @@ const Navbar = () => {
                         </Link>
 
                         {/* AI Tools Mega Menu */}
-                        <div className="relative" ref={aiRef} onMouseEnter={() => handleMouseEnter('ai')} onMouseLeave={() => handleMouseLeave('ai')}>
+                        <div className="relative" onMouseEnter={() => handleMouseEnter('ai')}>
                             <button
-                                onClick={() => setShowAIMenu(!showAIMenu)}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showAIMenu ? 'bg-purple-600/20 border border-purple-500/50' : 'hover:bg-slate-800'
+                                onClick={() => toggleMenu('ai')}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${activeMenu === 'ai' ? 'bg-purple-600/20 border border-purple-500/50' : 'hover:bg-slate-800'
                                     }`}
                             >
                                 <Sparkles size={18} className="text-purple-400" />
                                 <span>AI Tools</span>
-                                <ChevronDown size={16} className={`transition-transform ${showAIMenu ? 'rotate-180' : ''}`} />
+                                <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === 'ai' ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {showAIMenu && (
-                                <div className="absolute left-0 mt-2 w-72 bg-slate-800 border border-purple-500/50 rounded-lg shadow-xl overflow-hidden z-50">
+                            {activeMenu === 'ai' && (
+                                <div className="absolute left-0 mt-2 w-72 bg-slate-800 border border-purple-500/50 rounded-lg shadow-xl overflow-hidden z-[101] animate-in fade-in slide-in-from-top-2 duration-200">
                                     <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 px-4 py-2 border-b border-purple-500/30">
                                         <p className="text-xs text-purple-300 font-semibold">AI-POWERED FEATURES</p>
                                     </div>
@@ -293,18 +287,18 @@ const Navbar = () => {
                         </div>
 
                         {/* Preparation Mega Menu */}
-                        <div className="relative" ref={prepRef} onMouseEnter={() => handleMouseEnter('prep')} onMouseLeave={() => handleMouseLeave('prep')}>
+                        <div className="relative" onMouseEnter={() => handleMouseEnter('prep')}>
                             <button
-                                onClick={() => setShowPrepMenu(!showPrepMenu)}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showPrepMenu ? 'bg-slate-800' : 'hover:bg-slate-800'
+                                onClick={() => toggleMenu('prep')}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${activeMenu === 'prep' ? 'bg-slate-800' : 'hover:bg-slate-800'
                                     }`}
                             >
                                 <span>Preparation</span>
-                                <ChevronDown size={16} className={`transition-transform ${showPrepMenu ? 'rotate-180' : ''}`} />
+                                <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === 'prep' ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {showPrepMenu && (
-                                <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+                            {activeMenu === 'prep' && (
+                                <div className="absolute left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-[101] animate-in fade-in slide-in-from-top-2 duration-200">
                                     <Link
                                         to="/quizzes"
                                         className="flex items-center space-x-3 px-4 py-3 hover:bg-slate-700 transition border-b border-slate-700"
@@ -346,18 +340,18 @@ const Navbar = () => {
                         </div>
 
                         {/* Resources Mega Menu */}
-                        <div className="relative" ref={resourcesRef} onMouseEnter={() => handleMouseEnter('resources')} onMouseLeave={() => handleMouseLeave('resources')}>
+                        <div className="relative" onMouseEnter={() => handleMouseEnter('resources')}>
                             <button
-                                onClick={() => setShowResourcesMenu(!showResourcesMenu)}
-                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${showResourcesMenu ? 'bg-slate-800' : 'hover:bg-slate-800'
+                                onClick={() => toggleMenu('resources')}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${activeMenu === 'resources' ? 'bg-slate-800' : 'hover:bg-slate-800'
                                     }`}
                             >
                                 <span>Resources</span>
-                                <ChevronDown size={16} className={`transition-transform ${showResourcesMenu ? 'rotate-180' : ''}`} />
+                                <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === 'resources' ? 'rotate-180' : ''}`} />
                             </button>
 
-                            {showResourcesMenu && (
-                                <div className="absolute left-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50">
+                            {activeMenu === 'resources' && (
+                                <div className="absolute left-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-[101] animate-in fade-in slide-in-from-top-2 duration-200">
                                     {/* Top Companies Section */}
                                     <div className="px-4 py-2 bg-slate-900 border-b border-slate-700">
                                         <p className="text-xs font-semibold text-slate-400 uppercase">Top Recruiters</p>
@@ -432,6 +426,7 @@ const Navbar = () => {
 
                         <Link
                             to="/resume-analyzer"
+                            onMouseEnter={() => setActiveMenu(null)}
                             className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition ${isActive('/resume-analyzer') ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
                                 }`}
                         >

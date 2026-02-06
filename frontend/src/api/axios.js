@@ -1,13 +1,14 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:5001/api',
+    baseURL: 'http://127.0.0.1:5001/api',
     headers: {
         'Content-Type': 'application/json',
     },
+    // Prevent requests from hanging indefinitely
+    timeout: 15000,
 });
 
-// Add a request interceptor to attach the token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
@@ -19,7 +20,6 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Add a response interceptor to handle errors
 api.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -27,8 +27,10 @@ api.interceptors.response.use(
             // Token invalid or expired
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            // Optional: Redirect to login
-            // window.location.href = '/login'; 
+            // Redirect to login so the user is clearly logged out
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

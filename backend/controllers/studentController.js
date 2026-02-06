@@ -1,3 +1,5 @@
+const fs = require('fs').promises;
+const path = require('path');
 const Student = require('../models/Student');
 const Job = require('../models/Job');
 const Application = require('../models/Application');
@@ -131,7 +133,7 @@ exports.uploadResume = async (req, res) => {
             });
         }
 
-        console.log('📄 Parsing resume...');
+
 
         // Parse resume using Gemini AI
         const fileBuffer = req.file.buffer;
@@ -159,7 +161,7 @@ exports.uploadResume = async (req, res) => {
             { new: true }
         );
 
-        console.log('✅ Resume uploaded and parsed successfully');
+
 
         res.json({
             success: true,
@@ -273,7 +275,6 @@ exports.verifyCertificates = async (req, res) => {
 
         // Verify 10th Certificate
         if (student.tenth.certificate) {
-            console.log('🔍 Verifying 10th certificate with AI...');
             const tenthPDF = await downloadFromCloudStorage(student.tenth.certificate);
             const tenthText = await pdfService.extractTextFromPDF(tenthPDF);
             const tenthVerification = await geminiService.verifyCertificate(tenthText, {
@@ -294,7 +295,6 @@ exports.verifyCertificates = async (req, res) => {
 
         // Verify 12th Certificate
         if (student.twelfth.certificate) {
-            console.log('🔍 Verifying 12th certificate with AI...');
             const twelfthPDF = await downloadFromCloudStorage(student.twelfth.certificate);
             const twelfthText = await pdfService.extractTextFromPDF(twelfthPDF);
             const twelfthVerification = await geminiService.verifyCertificate(twelfthText, {
@@ -448,7 +448,7 @@ exports.applyToJob = async (req, res) => {
         job.totalApplications += 1;
         await job.save();
 
-        console.log(`✅ Application submitted for job: ${job.title}`);
+
 
         res.json({
             success: true,
@@ -793,30 +793,187 @@ exports.completeAIInterview = async (req, res) => {
 };
 
 // Offer Letter Logic (Basic)
+// Offer Letter Logic
 exports.getOfferLetter = async (req, res) => {
-    const { applicationId } = req.params;
-    // Implementation would fetch offer details from application.offerLetter
-    res.json({ message: 'Offer letter details' });
+    try {
+        const { applicationId } = req.params;
+        const student = await Student.findOne({ userId: req.userId });
+
+        const application = await Application.findOne({
+            _id: applicationId,
+            studentId: student._id
+        }).populate('companyId', 'companyName logo');
+
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        // Check if offer exists
+        if (!application.offerLetter || !application.offerLetter.generated) {
+            return res.status(404).json({ success: false, message: 'Offer letter not available yet' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                offerLetter: application.offerLetter,
+                company: application.companyId
+            }
+        });
+    } catch (error) {
+        console.error('Get Offer Letter Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 };
 
 exports.acceptOffer = async (req, res) => {
-    // Logic to update status to 'Offer Accepted'
-    res.json({ message: 'Offer Accepted' });
+    try {
+        const { applicationId } = req.params;
+        const student = await Student.findOne({ userId: req.userId });
+
+        const application = await Application.findOne({
+            _id: applicationId,
+            studentId: student._id
+        });
+
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        if (application.status !== 'Offer Extended') {
+            return res.status(400).json({ success: false, message: 'No pending offer found for this application' });
+        }
+
+        // Update Application
+        application.status = 'Offer Accepted';
+        application.offerLetter.accepted = true;
+        application.offerLetter.acceptedAt = new Date();
+
+        application.timeline.push({
+            stage: 'Offer Accepted',
+            status: 'Offer Accepted',
+            timestamp: new Date(),
+            notes: 'Student accepted the offer'
+        });
+
+        await application.save();
+
+        // Update Student
+        student.placementStatus = 'Placed';
+        student.placedCompany = application.companyId;
+        student.offerLetter = {
+            url: application.offerLetter.url,
+            generatedAt: application.offerLetter.generatedAt,
+            salary: application.offerLetter.details.salary,
+            joiningDate: application.offerLetter.details.joiningDate
+        };
+
+        await student.save();
+
+        res.json({
+            success: true,
+            message: 'Offer accepted successfully. Congratulations!',
+            data: application
+        });
+    } catch (error) {
+        console.error('Accept Offer Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 };
 
 exports.rejectOffer = async (req, res) => {
-    // Logic to update status to 'Offer Rejected'
-    res.json({ message: 'Offer Rejected' });
+    try {
+        const { applicationId } = req.params;
+        const { reason } = req.body;
+        const student = await Student.findOne({ userId: req.userId });
+
+        const application = await Application.findOne({
+            _id: applicationId,
+            studentId: student._id
+        });
+
+        if (!application) {
+            return res.status(404).json({ success: false, message: 'Application not found' });
+        }
+
+        if (application.status !== 'Offer Extended') {
+            return res.status(400).json({ success: false, message: 'No pending offer to reject' });
+        }
+
+        // Update Application
+        application.status = 'Offer Rejected';
+        application.rejectionReason = reason || 'Rejected by Student';
+        application.rejectedAt = new Date();
+        application.rejectedBy = 'Student';
+
+        application.timeline.push({
+            stage: 'Offer Rejected',
+            status: 'Offer Rejected',
+            timestamp: new Date(),
+            notes: `Student rejected the offer. Reason: ${reason || 'N/A'}`
+        });
+
+        await application.save();
+
+        res.json({
+            success: true,
+            message: 'Offer rejected successfully',
+            data: application
+        });
+    } catch (error) {
+        console.error('Reject Offer Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 };
 
-// Helper function (implement cloud storage)
+// Helper function to simulate cloud storage (using local storage)
 async function uploadToCloudStorage(file) {
-    // TODO: Implement S3/Cloudinary upload
-    // For now, return a placeholder URL
-    return `https://storage.example.com/${Date.now()}_${file.originalname}`;
+    const uploadDir = path.join(__dirname, '../uploads');
+
+    // Ensure directory exists
+    try {
+        await fs.access(uploadDir);
+    } catch {
+        await fs.mkdir(uploadDir, { recursive: true });
+    }
+
+    const timestamp = Date.now();
+    // Sanitize filename
+    const sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+    const filename = `${timestamp}-${sanitizedFilename}`;
+    const filePath = path.join(uploadDir, filename);
+
+    await fs.writeFile(filePath, file.buffer);
+
+    // Return relative URL for frontend access
+    return `/uploads/${filename}`;
 }
 
-async function downloadFromCloudStorage(url) {
-    // TODO: Implement download from cloud storage
-    return Buffer.from('');
+async function downloadFromCloudStorage(fileUrl) {
+    try {
+        let filePath;
+
+        // Handle relative URL (local storage)
+        if (fileUrl && fileUrl.startsWith('/uploads/')) {
+            const filename = fileUrl.split('/').pop();
+            filePath = path.join(__dirname, '../uploads', filename);
+        } else if (fileUrl && !fileUrl.startsWith('http')) {
+            // Assume it's already a file path if not a URL
+            filePath = fileUrl;
+        } else {
+            // It's an external URL or mock, can't read locally
+            console.warn('Cannot read external URL locally:', fileUrl);
+            return Buffer.from('');
+        }
+
+        const fileBuffer = await fs.readFile(filePath);
+        return fileBuffer;
+    } catch (error) {
+        console.error('Download Error:', error);
+        // If file not found, maybe return specific error
+        if (error.code === 'ENOENT') {
+            throw new Error('File not found in storage');
+        }
+        throw new Error('Failed to download file');
+    }
 }

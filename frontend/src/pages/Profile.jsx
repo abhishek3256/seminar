@@ -1,202 +1,211 @@
-import { useState, useEffect } from 'react';
-import { User, Mail, Phone, MapPin, Briefcase, Calendar, Edit2, Save, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import Layout from '../components/layout/Layout';
+import { User, Mail, Phone, MapPin, Upload, Briefcase, GraduationCap } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 const Profile = () => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [user, setUser] = useState({});
-
-    // Form state - initially empty, filled on load
-    const [formData, setFormData] = useState({
-        fullName: '',
-        email: '',
-        phone: '',
-        branch: '',
-        skills: '',
-        bio: ''
-    });
+    const { user } = useAuth();
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         const fetchProfile = async () => {
-            try {
-                const res = await api.get('/student/profile');
-                if (res.data.success) {
-                    const student = res.data.data;
-                    setUser(student); // Store full student object
+            if (!user) {
+                setLoading(false);
+                return;
+            }
 
-                    // Populate form
-                    setFormData({
-                        fullName: student.fullName || '',
-                        email: student.userId?.email || '', // Depending on how populate works, might be student.userId.email
-                        phone: student.phone || '',
-                        branch: student.branch || '',
-                        skills: Array.isArray(student.skills) ? student.skills.join(', ') : (student.skills || ''),
-                        bio: student.bio || ''
-                    });
+            try {
+                if (user.role === 'student') {
+                    const res = await api.get('/student/profile');
+                    if (res.data?.success) {
+                        setProfile(res.data.data);
+                    } else {
+                        setError(res.data?.message || 'Failed to load profile');
+                    }
+                } else if (user.role === 'company') {
+                    const res = await api.get('/company/profile');
+                    if (res.data?.success) {
+                        setProfile(res.data.data);
+                    } else {
+                        setError(res.data?.message || 'Failed to load profile');
+                    }
+                } else {
+                    setLoading(false);
+                    return;
                 }
-            } catch (error) {
-                console.error("Failed to fetch profile", error);
+            } catch (err) {
+                console.error('Failed to fetch profile', err);
+                setError(err.response?.data?.message || 'Failed to load profile');
             } finally {
-                setIsLoading(false);
+                setLoading(false);
             }
         };
 
         fetchProfile();
-    }, []);
+    }, [user]);
 
-    const handleSave = async () => {
-        try {
-            // Convert skills string back to array if needed by backend, but backend logic allows update
-            // Check studentController updateProfile logic. It takes raw body.
-            // If skills expected as array, split.
-            const payload = {
-                ...formData,
-                skills: formData.skills.split(',').map(s => s.trim())
-            };
+    const displayName =
+        profile?.fullName ||
+        profile?.companyName ||
+        user?.fullName ||
+        user?.companyName ||
+        user?.name ||
+        user?.email ||
+        'User';
 
-            const res = await api.put('/student/profile', payload);
+    const phone =
+        profile?.phone ||
+        profile?.hrPhone ||
+        '';
 
-            if (res.data.success) {
-                setUser(res.data.data);
-                setIsEditing(false);
-            }
-        } catch (error) {
-            console.error("Failed to update profile", error);
-            alert("Failed to update profile");
-        }
-    };
-
-    if (isLoading) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-                <Loader2 className="animate-spin text-blue-500 w-8 h-8" />
-            </div>
-        );
-    }
+    const location =
+        profile?.headquartersLocation ||
+        profile?.currentLocation ||
+        '';
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white pt-40 pb-8 px-8">
-            <div className="max-w-5xl mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-                        My Profile
-                    </h1>
-                    <p className="text-slate-400 mt-2">Manage your account information</p>
+        <Layout>
+            <div className="space-y-6">
+                {/* Header / Cover */}
+                <div className="relative h-48 rounded-xl bg-gradient-to-r from-blue-900 to-purple-900 overflow-hidden">
+                    <div className="absolute inset-0 bg-pattern opacity-20"></div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Profile Card */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-xl p-6"
-                    >
-                        <div className="text-center">
-                            <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-4xl font-bold">{formData.fullName?.charAt(0) || 'U'}</span>
-                            </div>
-                            <h2 className="text-2xl font-bold mb-1">{formData.fullName}</h2>
-                            <p className="text-slate-400 mb-4">{formData.branch ? `${formData.branch} Student` : 'Student'}</p>
-
-                            <div className="space-y-3 text-sm text-left">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Mail size={16} />
-                                    <span className="truncate">{formData.email}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Phone size={16} />
-                                    <span>{formData.phone}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-400">
-                                    <Briefcase size={16} />
-                                    <span>{user.rollNumber || 'N/A'}</span>
-                                </div>
-                            </div>
+                {/* Profile Info */}
+                <div className="relative px-6 -mt-20">
+                    <div className="flex flex-col md:flex-row items-end gap-6">
+                        <div className="w-32 h-32 rounded-full border-4 border-slate-950 bg-slate-800 flex items-center justify-center overflow-hidden">
+                            {profile?.profilePhoto || user?.profilePhoto ? (
+                                <img
+                                    src={profile?.profilePhoto || user.profilePhoto}
+                                    alt="Profile"
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <User size={64} className="text-slate-500" />
+                            )}
                         </div>
-                    </motion.div>
-
-                    {/* Details Card */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6"
-                    >
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold">Profile Information</h3>
-                            <button
-                                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition"
-                            >
-                                {isEditing ? <><Save size={16} /> Save</> : <><Edit2 size={16} /> Edit</>}
+                        <div className="flex-1 pb-4">
+                            <h1 className="text-3xl font-bold text-white">{displayName}</h1>
+                            <p className="text-slate-400 capitalize">{user?.role || 'student'}</p>
+                        </div>
+                        <div className="pb-4">
+                            <button className="btn-primary flex items-center gap-2">
+                                <Upload size={18} /> Update Resume
                             </button>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={formData.fullName}
-                                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    disabled={!isEditing}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                />
-                            </div>
+                {error && (
+                    <div className="mx-6 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm">
+                        {error}
+                    </div>
+                )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-400 mb-2">Phone</label>
-                                    <input
-                                        type="text"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        disabled={!isEditing}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                    />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+                    {/* Left Column */}
+                    <div className="space-y-6">
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <h3 className="font-bold text-white mb-4">Contact Info</h3>
+                            <div className="space-y-4 text-slate-300">
+                                <div className="flex items-center gap-3">
+                                    <Mail size={18} className="text-slate-500" />
+                                    <span>{user?.email || 'email@example.com'}</span>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-400 mb-2">Branch</label>
-                                    <input
-                                        type="text"
-                                        value={formData.branch}
-                                        onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                        disabled={!isEditing}
-                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                    />
+                                <div className="flex items-center gap-3">
+                                    <Phone size={18} className="text-slate-500" />
+                                    <span>{phone || 'Add your phone number'}</span>
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-2">Bio</label>
-                                <textarea
-                                    value={formData.bio}
-                                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                    disabled={!isEditing}
-                                    rows={3}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-2">Skills</label>
-                                <input
-                                    type="text"
-                                    value={formData.skills}
-                                    onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                                    disabled={!isEditing}
-                                    placeholder="Comma separated skills"
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                                />
+                                <div className="flex items-center gap-3">
+                                    <MapPin size={18} className="text-slate-500" />
+                                    <span>{location || 'Add your location'}</span>
+                                </div>
                             </div>
                         </div>
-                    </motion.div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <h3 className="font-bold text-white mb-4">Skills</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {(profile?.skills && profile.skills.length > 0
+                                    ? profile.skills
+                                    : ['React', 'Node.js', 'Python', 'Machine Learning', 'SQL']
+                                ).map((skill) => (
+                                    <span
+                                        key={skill}
+                                        className="px-3 py-1 bg-slate-800 rounded-full text-sm text-slate-300 border border-slate-700"
+                                    >
+                                        {skill}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="md:col-span-2 space-y-6">
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                                <GraduationCap className="text-blue-400" /> Education
+                            </h3>
+                            <div className="space-y-6">
+                                {profile?.branch || profile?.semester || profile?.currentCGPA ? (
+                                    <div className="pl-4 border-l-2 border-slate-700">
+                                        <h4 className="font-bold text-white">
+                                            {profile.branch || 'Your Program'}
+                                        </h4>
+                                        <p className="text-slate-400 text-sm">
+                                            Semester {profile.semester || '-'} • CGPA:{' '}
+                                            {profile.currentCGPA || 'N/A'}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="pl-4 border-l-2 border-slate-700">
+                                        <h4 className="font-bold text-white">Add your education details</h4>
+                                        <p className="text-slate-500 text-sm">
+                                            Update your branch, semester, and CGPA to get better job matches.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                                <Briefcase className="text-purple-400" /> Experience
+                            </h3>
+                            <div className="space-y-6">
+                                {profile?.experience && profile.experience.length > 0 ? (
+                                    profile.experience.map((exp, idx) => (
+                                        <div key={idx} className="pl-4 border-l-2 border-slate-700">
+                                            <h4 className="font-bold text-white">{exp.role}</h4>
+                                            <p className="text-slate-400 text-sm">
+                                                {exp.company} • {exp.duration}
+                                            </p>
+                                            {exp.description && (
+                                                <p className="text-slate-500 mt-2 text-sm">
+                                                    {exp.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="pl-4 border-l-2 border-slate-700">
+                                        <h4 className="font-bold text-white">Add your experience</h4>
+                                        <p className="text-slate-500 text-sm">
+                                            Showcase your internships, projects, or work experience here.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </Layout>
     );
 };
 
